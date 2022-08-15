@@ -6,13 +6,13 @@
 #include <fstream>
 #include <cfloat>
 
-#define Np 4096
-#define rho 1.2
-#define Nn 100
+#define Np 4096 //particle number
+#define rho 1.2 //number density
+#define Nn 100  //neigbour list
 //#define L 40.8248290464
 # define L sqrt(Np/rho)
-#define teq 10000
-#define tmax 10000
+#define teq 10000 //equilibration time
+#define tmax 10000 //production run time
 #define dtmd 0.001
 #define dtbd 0.005
 #define temp 0.4
@@ -294,10 +294,13 @@ int main(){
   double tout=0.0,U,disp_max=0.0,temp_anneal;
   int j=0;
   int M=(int)(L/(cut+skin));
+  //seed
+  srand(1);
+
   set_diameter(a);
   ini_coord_square(x);
   ini_array(v);
-  list_verlet(list,x);
+  cell_list(list,x,M);
   std::cout<<"L="<<L<<"M="<<M<<std::endl;
 
   j=0;
