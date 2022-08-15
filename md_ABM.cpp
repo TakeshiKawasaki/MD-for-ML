@@ -13,12 +13,12 @@
 # define L sqrt(Np/rho)
 #define teq 10000 //equilibration time
 #define tmax 10000 //production run time
-#define dtmd 0.001
-#define dtbd 0.005
-#define temp 0.4
-#define dim 2
-#define cut 2.5
-#define skin 1.0
+#define dtmd 0.001 //dt for molecular dynamics
+#define dtbd 0.005 //dt for brownian dynamics
+#define temp 0.4 // temperature
+#define dim 2 //spatial dimension
+#define cut 2.5 //potential cut off
+#define skin 1.0// skin size for list update
 
 double unif_rand(double left, double right)
 {
