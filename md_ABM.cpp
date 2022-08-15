@@ -6,19 +6,19 @@
 #include <fstream>
 #include <cfloat>
 
-#define Np 4096 //particle number
-#define rho 1.2 //number density
-#define Nn 100  //neigbour list
+#define Np 4096
+#define rho 1.2
+#define Nn 100
 //#define L 40.8248290464
 # define L sqrt(Np/rho)
-#define teq 10000 //equilibration time
-#define tmax 10000 //production run time
-#define dtmd 0.001 //dt for molecular dynamics
-#define dtbd 0.005 //dt for brownian dynamics
-#define temp 0.4 // temperature
-#define dim 2 //spatial dimension
-#define cut 2.5 //potential cut off
-#define skin 1.0// skin size for list update
+#define teq 10000
+#define tmax 10000
+#define dtmd 0.001
+#define dtbd 0.005
+#define temp 0.4
+#define dim 2
+#define cut 2.5
+#define skin 1.0
 
 double unif_rand(double left, double right)
 {
@@ -128,7 +128,7 @@ void cell_list(int (*list)[Nn],double (*x)[dim],int M)
   int nx,ny;
   int l,m;
   double dx,dy,r2;
-  double thresh=cut+skin;
+  double thresh=cut*7./6.+skin;
 
   int (*map)[Np]=new int[M*M][Np];
 
@@ -186,17 +186,17 @@ void calc_force(double (*x)[dim],double (*f)[dim],double *a,double *U,int (*list
       dx-=L*floor((dx+0.5*L)/L);
       dy-=L*floor((dy+0.5*L)/L);
       dr2=dx*dx+dy*dy;
-      if(dr2<cut*cut){
+      if(dr2<cut*cut*aij*aij){
 	aij=0.5*(a[i]+a[list[i][j]]);
 	dr=sqrt(dr2);
 	w2=aij*aij/dr2;
 	w6=w2*w2*w2;
 	w12=w6*w6;
 
-	w2cut=aij*aij/cut/cut;
+	w2cut=1./cut/cut;
 	w6cut=w2cut*w2cut*w2cut;
 	w12cut=w6cut*w6cut;
-	dUrcut=-48.*w12cut/cut+24.*w6cut/cut;
+	dUrcut=-48.*w12cut/(cut*aij)+24.*w6cut/(cut*aij);
 	Ucut=4.*w12cut-4.*w6cut;
 
 	dUr=(-48.*w12+24*w6)/dr2-dUrcut/dr;
@@ -204,7 +204,7 @@ void calc_force(double (*x)[dim],double (*f)[dim],double *a,double *U,int (*list
 	f[list[i][j]][0]+=dUr*dx;
 	f[i][1]-=dUr*dy;
 	f[list[i][j]][1]+=dUr*dy;
-	*U+=4.*w12-4.*w6-Ucut-dUrcut*(dr-cut);
+	*U+=4.*w12-4.*w6-Ucut-dUrcut*(dr-cut*aij);
       }
     }
 }
@@ -293,14 +293,11 @@ int main(){
   int list[Np][Nn];
   double tout=0.0,U,disp_max=0.0,temp_anneal;
   int j=0;
-  int M=(int)(L/(cut+skin));
-  //seed
-  srand(1);
-
+  int M=(int)(L/(cut*7./6.+skin));
   set_diameter(a);
   ini_coord_square(x);
   ini_array(v);
-  cell_list(list,x,M);
+  list_verlet(list,x);
   std::cout<<"L="<<L<<"M="<<M<<std::endl;
 
   j=0;
