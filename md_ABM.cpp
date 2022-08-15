@@ -6,19 +6,21 @@
 #include <fstream>
 #include <cfloat>
 
-#define Np 4096
-#define rho 1.2
-#define Nn 100
+
+#define Np 4096 //# of the particles
+#define rho 1.2 //# density
+#define Nn 100  //# of the neigbour lists
 //#define L 40.8248290464
 # define L sqrt(Np/rho)
-#define teq 10000
-#define tmax 10000
-#define dtmd 0.001
-#define dtbd 0.005
-#define temp 0.4
-#define dim 2
-#define cut 2.5
-#define skin 1.0
+#define teq 10000 //equilibration time
+#define tmax 10000 //production run time
+#define dtmd 0.001 //dt for molecular dynamics
+#define dtbd 0.005 //dt for brownian dynamics
+#define temp 0.4 // temperature
+#define dim 2 //spatial dimension
+#define cut 2.5 //potential cut off
+#define skin 1.0// skin size for list update
+
 
 double unif_rand(double left, double right)
 {
@@ -186,8 +188,8 @@ void calc_force(double (*x)[dim],double (*f)[dim],double *a,double *U,int (*list
       dx-=L*floor((dx+0.5*L)/L);
       dy-=L*floor((dy+0.5*L)/L);
       dr2=dx*dx+dy*dy;
+      aij=0.5*(a[i]+a[list[i][j]]);
       if(dr2<cut*cut*aij*aij){
-	aij=0.5*(a[i]+a[list[i][j]]);
 	dr=sqrt(dr2);
 	w2=aij*aij/dr2;
 	w6=w2*w2*w2;
@@ -297,7 +299,7 @@ int main(){
   set_diameter(a);
   ini_coord_square(x);
   ini_array(v);
-  list_verlet(list,x);
+  cell_list(list,x,M);
   std::cout<<"L="<<L<<"M="<<M<<std::endl;
 
   j=0;
