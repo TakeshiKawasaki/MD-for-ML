@@ -195,11 +195,11 @@ void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list)[N
       }
       if(a[i]+a[list[i][j]] == 3){
 	aij=0.8;
-	eij=0.5;
+	eij=1.5;
       }
       if(a[i]+a[list[i][j]] == 2){
 	aij=0.88;
-	eij=1.5;
+	eij=0.5;
       }
 
       if(dr2<cut*cut*aij*aij){
