@@ -187,7 +187,7 @@ void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list)[N
       dx-=L*floor((dx+0.5*L)/L);
       dy-=L*floor((dy+0.5*L)/L);
       dr2=dx*dx+dy*dy;
-      if(a[i]+a[list[i][j]] == 4){
+      if(a[i]+a[list[i][j]] == 2){
 	aij=1.0;
 	eij=1.0;
   //      1:0 0:8 0:88
@@ -197,7 +197,7 @@ void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list)[N
 	aij=0.8;
 	eij=1.5;
       }
-      if(a[i]+a[list[i][j]] == 2){
+      if(a[i]+a[list[i][j]] == 4){
 	aij=0.88;
 	eij=0.5;
       }
