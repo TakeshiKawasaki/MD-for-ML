@@ -71,7 +71,7 @@ void set_diameter(int *a){
     a[2*i+1]=1;
   }
   for(int i=0.7*Np;i<Np;i++)
-    a[i]=;
+    a[i]=1;
 }
 
 void p_boundary(double (*x)[dim]){
