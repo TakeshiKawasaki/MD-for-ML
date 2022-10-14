@@ -175,7 +175,7 @@ void cell_list(int (*list)[Nn],double (*x)[dim],int M)
 }
 
 void calc_force_hs(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list)[Nn]){
-  double dx,dy,dz,dr2,dUr,w2,w6,w12,w2cut,w6cut,w12cut,aij,eij,dUrcut,Ucut,dr,t;
+  double dx,dy,dz,dr2,dr,dUr,w2,w6,w12,w2cut,w6cut,w12cut,aij,eij,dUrcut,Ucut,dr,t;
   ini_array(f);
   *U=0;
   for(int i=0;i<Np;i++)
@@ -203,16 +203,17 @@ void calc_force_hs(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list
 	eij=0.5;
       }
 
-      if(dr2<aij*aij){
+      if(dr2<aij*aij){      
+	dr=sqrt(dr2);
 	//	printf("%f\n",t);
 	t=sqrt(dr2/aij*aij);
 	dUr=-(1.-t)/aij;
-	f[i][0]-=dUr*dx;
-	f[list[i][j]][0]+=dUr*dx;
-	f[i][1]-=dUr*dy;
-	f[list[i][j]][1]+=dUr*dy;
-	f[i][2]-=dUr*dz;
-	f[list[i][j]][2]+=dUr*dz;
+	f[i][0]-=dUr*dx/dr;
+	f[list[i][j]][0]+=dUr*dx/dr;
+	f[i][1]-=dUr*dy/dr;
+	f[list[i][j]][1]+=dUr*dy/dr;
+	f[i][2]-=dUr*dz/dr;
+	f[list[i][j]][2]+=dUr*dz/dr;
       }
     }
 }
