@@ -175,7 +175,7 @@ void cell_list(int (*list)[Nn],double (*x)[dim],int M)
 }
 
 void calc_force_hs(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list)[Nn]){
-  double dx,dy,dz,dr2,dr,dUr,w2,w6,w12,w2cut,w6cut,w12cut,aij,eij,dUrcut,Ucut,dr,t;
+  double dx,dy,dz,dr2,dr,dUr,w2,w6,w12,w2cut,w6cut,w12cut,aij,eij,dUrcut,Ucut,t;
   ini_array(f);
   *U=0;
   for(int i=0;i<Np;i++)
