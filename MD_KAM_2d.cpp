@@ -8,7 +8,7 @@
 
 
 #define Np 4000 //# of the particles
-#define rho 1.09 //# density
+#define rho 1.2 //# density
 #define Nn 100  //# of the neigbour lists
 #define L sqrt(Np/rho)
 #define teq 10000 //equilibration time
