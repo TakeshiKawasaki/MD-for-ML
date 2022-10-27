@@ -8,7 +8,7 @@
 
 #define Np 4000 //# of the particles
 #define rho 1.2 //# density
-#define Nn 1000  //# of the neigbour lists
+#define Nn 4500  //# of the neigbour lists
 #define L pow(Np/rho,1./3.)
 #define teq 50 //equilibration time
 //#define tmax 1000 //production run time
@@ -98,10 +98,15 @@ void scale_sliding_blick(double (*x)[dim],double gamma)
 }
 
 
-void ini_array(double (*x)[dim]){
+void ini_matrix(double (*x)[dim]){
   for(int i=0;i<Np;i++)
     for(int j=0;j<dim;j++)
       x[i][j]=0.0;
+}
+
+void ini_array(double *x){
+  for(int i=0;i<Np;i++)
+      x[i]=0.0;
 }
 
 
@@ -123,9 +128,9 @@ void cell_list(int (*list)[Nn],double (*x)[dim],int M,double gamma)
   int nx,ny,nz;
   int l,m,n;
   double dx,dy,dy_temp,dz,r2;
-  double thresh=cut*7./6.*sqrt(2.0)+skin;
+  double thresh=cut+skin;
   
-  int (*map)[Np]=new int[M*M*M][Np];
+  int (*map)[Np+1]=new int[M*M*M][Np+1];
   
   for(i=0;i<M;i++)
     for(j=0;j<M;j++)
@@ -149,9 +154,12 @@ void cell_list(int (*list)[Nn],double (*x)[dim],int M,double gamma)
     nx = f((int)((x[i][0]-gamma*x[i][1])*M/L),M);
     ny = f((int)(x[i][1]*M/L),M);
     nz = f((int)(x[i][2]*M/L),M);
-    
+    // std::cout<<nx<<std::endl;
+    // printf("map=%d,%d\n",nx+M*ny+M*M*nz,map[nx+M*ny+M*M*nz][0]);
+
     for (k=1; k<=(map[nx+M*ny+M*M*nz][0]); k++){
       j = map[nx+M*ny+M*M*nz][k];
+     
       if(j>i){
 	dx =x[i][0] - x[j][0];
 	dy =x[i][1] - x[j][1];
@@ -176,7 +184,7 @@ void cell_list(int (*list)[Nn],double (*x)[dim],int M,double gamma)
 
 void calc_force_hs(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list)[Nn]){
   double dx,dy,dz,dr2,dUr,w2,w6,w12,w2cut,w6cut,w12cut,aij,eij,dUrcut,Ucut,dr,t;
-  ini_array(f);
+  ini_matrix(f);
   *U=0;
   for(int i=0;i<Np;i++)
     for(int j=1;j<=list[i][0];j++){
@@ -218,10 +226,13 @@ void calc_force_hs(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list
     }
 }
 
-void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,double *rfxy,int (*list)[Nn],double gamma){
+void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,double *rfxy,int (*list)[Nn],double gamma,double *stress){
   double dx,dy,dy_temp,dz,dr2,dUr,w2,w6,w12,w2cut,w6cut,w12cut,aij,eij,dUrcut,Ucut,dr;
   double V = L*L*L;
-  ini_array(f);
+ 
+  ini_matrix(f);
+  ini_array(stress);
+  
   *U=0,*rfxy=0.0;
   for(int i=0;i<Np;i++)
     for(int j=1;j<=list[i][0];j++){
@@ -233,14 +244,14 @@ void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,double *rfxy,
       dx-=gamma*L*floor((dy_temp+0.5*L)/L);
       dx-=L*floor((dx+0.5*L)/L);
       dz-=L*floor((dz+0.5*L)/L);
-
+      
       dr2=dx*dx+dy*dy+dz*dz;
-
+      
       if(a[i]+a[list[i][j]] == 2){
 	aij=1.0;
 	eij=1.0;
-  //      1.0 0.8 0.88
-  //	  1.0 0.5 1.5
+	//      1.0 0.8 0.88
+	//	  1.0 0.5 1.5
       }
       if(a[i]+a[list[i][j]] == 3){
 	aij=0.8;
@@ -250,30 +261,33 @@ void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,double *rfxy,
 	aij=0.88;
 	eij=0.5;
       }
-
+      
       if(dr2<cut*cut*aij*aij){
 	dr=sqrt(dr2);
 	w2=aij*aij/dr2;
 	w6=w2*w2*w2;
 	w12=w6*w6;
-
+	
 	w2cut=1./cut/cut;
 	w6cut=w2cut*w2cut*w2cut;
 	w12cut=w6cut*w6cut;
 	dUrcut=-48.*eij*w12cut/(cut*aij)+24.*eij*w6cut/(cut*aij);
 	Ucut=4.*eij*w12cut-4.*eij*w6cut;
-
+	
        	dUr=(-48.*eij*w12+24*eij*w6)/dr2-dUrcut/dr;
 	//	dUr=(-48.*eij*w12+24*eij*w6)/dr2;
-	f[i][0]-=dUr*dx;
-	f[list[i][j]][0]+=dUr*dx;
-	f[i][1]-=dUr*dy;
-	f[list[i][j]][1]+=dUr*dy;
-	f[i][2]-=dUr*dz;
-	f[list[i][j]][2]+=dUr*dz;
-       	*U+=4.*eij*(w12-w6)-Ucut-dUrcut*(dr-cut*aij);
+	f[i][0] -=dUr*dx;
+	f[list[i][j]][0] +=dUr*dx;
+	f[i][1] -=dUr*dy;
+	f[list[i][j]][1] +=dUr*dy;
+	f[i][2] -=dUr*dz;
+	f[list[i][j]][2] +=dUr*dz;
+       	*U +=4.*eij*(w12-w6)-Ucut-dUrcut*(dr-cut*aij);
 	//	*U+=4.*eij*(w12-w6)-Ucut;
 	*rfxy += dUr*dx*dy/V;
+	stress[i] += 0.5*dUr*dx*dy/V;
+	stress[list[i][j]] += 0.5*dUr*dx*dy/V;
+	//std::cout<<"f_ij="<<dUr*dx<<std::endl;
       }
     }
 }
@@ -293,12 +307,12 @@ void eom_langevin_hs(double (*v)[dim],double (*x)[dim],double (*f)[dim],int *a,d
 }
 
 
-void eom_langevin(double (*v)[dim],double (*x)[dim],double (*f)[dim],int *a,double *U,double dt,double temp0,int (*list)[Nn],double *kine){
+void eom_langevin(double (*v)[dim],double (*x)[dim],double (*f)[dim],int *a,double *U,double dt,double temp0,int (*list)[Nn],double *kine,double *stress){
   double zeta=1.0;
   double fluc=sqrt(2.*zeta*temp0*dt);
   double dummy;
-  *kine=0.0;
-  calc_force(x,f,a,U,&dummy,list,0.0);
+   *kine=0.0;
+  calc_force(x,f,a,U,&dummy,list,0.0,stress);
   for(int i=0;i<Np;i++)
     for(int j=0;j<dim;j++){
       v[i][j]+=-zeta*v[i][j]*dt+f[i][j]*dt+fluc*gaussian_rand();
@@ -308,7 +322,7 @@ void eom_langevin(double (*v)[dim],double (*x)[dim],double (*f)[dim],int *a,doub
   p_boundary(x);
 }
 
-void steepest_descent(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,int M,double *U){
+void steepest_descent(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,int M,double *U,double *stress){
   double dx,dy,dy_temp,dz,dt0=0.0001,zeta=0.0,sum_force =0.0,dxmax=0.0,dymax=0.0,dzmax=0.0,dummy=0.0;
   double x0[Np][dim],v[Np][dim];
   cell_list(list,x,M,gamma);
@@ -320,7 +334,7 @@ void steepest_descent(double (*x)[dim],double (*f)[dim],double gamma,int (*list)
     }
 
   for(;;){
-    calc_force(x,f,a,U,&dummy,list,gamma);
+    calc_force(x,f,a,U,&dummy,list,gamma,stress);
     sum_force=0.0;
     for(int i=0;i<Np;i++){
       for(int j=0;j<dim;j++){
@@ -374,7 +388,7 @@ void norm_array(double *d,double (*x)[dim]){
   *d = sqrt(*d);
 }
 
-int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,int M,double *U,double *rfxy)
+int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,int M,double *U,double *rfxy,double *stress)
 {
   int i,j,imax;
   double alpha = 0.1,P;
@@ -398,7 +412,7 @@ int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,i
   dymax = 0.0;
   dzmax = 0.0; //call list update
   
-  calc_force(x,f,a,U,rfxy,list,gamma);
+  calc_force(x,f,a,U,rfxy,list,gamma,stress);
    
   for(;;){
     P=0.0;
@@ -411,7 +425,7 @@ int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,i
 	x[i][j]+=v[i][j]*dt0+0.5*f[i][j]*dt0*dt0;
 	v[i][j]+=0.5*f[i][j]*dt0;
       }
-    calc_force(x,f,a,U,rfxy,list,gamma);
+    calc_force(x,f,a,U,rfxy,list,gamma,stress);
   
     for(i=0;i<Np;i++)
       for(j=0;j<dim;j++)
@@ -458,7 +472,7 @@ int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,i
       dzmax=0.0;
     }
     
-    // printf("FIRE: sum_force=%.16f,dt=%f,x=%f, alpha=%f,P=%f,gamma=%f \n",sum_force,dt0,x[0][0],alpha,P,gamma);
+    //    printf("FIRE: sum_force=%.16f,dt=%f,x=%f, alpha=%f,P=%f,gamma=%f \n",sum_force,dt0,x[0][0],alpha,P,gamma);
     if(P>=0){
       conv++;
       if(conv>5){
@@ -478,7 +492,7 @@ int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,i
 	for(j=0;j<dim;j++)
 	  v[i][j]= 0.0; 
     }
-    if(sum_force <1e-8||count>1e9){
+    if(sum_force <1e-12||count>1e9){
       scale_sliding_blick(x,gamma);
       std::cout<<"gamma="<<gamma<<"\t"<<"Iteration times ="<< count <<"\t"<<"energy="<<*U/(double)Np<<"\t"<<"stress ="<<*rfxy<<std::endl;
       break;  
@@ -488,14 +502,14 @@ int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,i
 }
 
 
-void eom_md(double (*v)[dim],double (*x)[dim],double (*f)[dim],int *a,double *U,double dt,int (*list)[Nn]){
+void eom_md(double (*v)[dim],double (*x)[dim],double (*f)[dim],int *a,double *U,double dt,int (*list)[Nn],double *stress){
   double dummy=0.0;
   for(int i=0;i<Np;i++)
     for(int j=0;j<dim;j++){
       x[i][j]+=v[i][j]*dt+0.5*f[i][j]*dt*dt;
       v[i][j]+=0.5*f[i][j]*dt;
     }
-  calc_force(x,f,a,U,&dummy,list,0.0);
+  calc_force(x,f,a,U,&dummy,list,0.0,stress);
 
   for(int i=0;i<Np;i++)
     for(int j=0;j<dim;j++){
@@ -504,23 +518,26 @@ void eom_md(double (*v)[dim],double (*x)[dim],double (*f)[dim],int *a,double *U,
   p_boundary(x);
 }
 
-void output_coord_NAD(double (*x)[dim],double(*x0)[dim],int *a,double gamma){
+void output_coord(double (*x)[dim],double(*x0)[dim],int *a,double gamma,double *stress){
   double dx,dy,dy_temp,dz; 
   char filename[128];
   std::ofstream file;
   sprintf(filename,"coord_disp_gamma%.3f.csv",gamma);
   file.open(filename);
-  file<< std::setprecision(6)<<"# type,x,y,z,dx_na,dy_na,dz_na"<<std::endl;
+  file<< std::setprecision(6)<<"# type[i],x[i],y[i],z[i],stress_xy[i]"<<std::endl;
   for(int i=0;i<Np;i++){
-    dy = x[i][1]-x0[i][1];
+    /*  dy = x[i][1]-x0[i][1];
     dx = x[i][0]-x0[i][0];
     dz = x[i][2]-x0[i][2];
     dy_temp=dy;
     dy -= L*floor((dy+0.5*L)/L);
     dx -= gamma*L*floor((dy_temp+0.5*L)/L);
     dx -= L*floor((dx+0.5*L)/L);
-    dz -= L*floor((dz+0.5*L)/L);
-    file<< std::setprecision(10)<<a[i]<<","<<x[i][0]<<","<<x[i][1]<<","<<x[i][2]<<","<<dx-gamma*x[i][1]<<","<<dy<<","<<dz<<std::endl;
+    dz -= L*floor((dz+0.5*L)/L);*/
+    if(a[i]==1)
+      file<< std::setprecision(10)<<(int)0<<","<<x[i][0]<<","<<x[i][1]<<","<<x[i][2]<<","<<stress[i]*Np<<std::endl;
+    if(a[i]==2)
+      file<< std::setprecision(10)<<(int)1<<","<<x[i][0]<<","<<x[i][1]<<","<<x[i][2]<<","<<stress[i]*Np<<std::endl;
   }
   file.close();
 }
@@ -529,7 +546,7 @@ void output_coord_NAD(double (*x)[dim],double(*x0)[dim],int *a,double gamma){
 void output(int k,double (*v)[dim],double U){
   char filename[128];
   double K=0.0;
-
+  
   std::ofstream file;
   sprintf(filename,"energy.dat");
   file.open(filename,std::ios::app); //append
@@ -570,7 +587,7 @@ void auto_list_update(double *disp_max,double (*x)[dim],double (*x_update)[dim],
   static int count=0;
   count++;
   calc_disp_max(&(*disp_max),x,x_update);
-  if(*disp_max > skin*skin*0.25){
+  if(*disp_max > 0.5*skin*skin*0.25){
     cell_list(list,x,M,0.0);
     update(x_update,x);
     *disp_max=0.0;
@@ -579,19 +596,20 @@ void auto_list_update(double *disp_max,double (*x)[dim],double (*x_update)[dim],
 }
 
 int main(){
-  double x[Np][dim],x0[Np][dim],x_update[Np][dim],v[Np][dim],f[Np][dim];
+  double x[Np][dim],x0[Np][dim],x_update[Np][dim],v[Np][dim],f[Np][dim],stress[Np];
   int list[Np][Nn],a[Np];
   double tout=0.0,U,rfxy,kine,disp_max=0.0,temp_anneal,gamma=0.0;
   int j=0;
-  int M=(int)(L/(cut+skin));
+  int M = (int)(L/(cut*sqrt(2.0)+skin));
+  // std::cout<<L/(cut*sqrt(2.0)+skin)<<std::endl;
   set_diameter(a);
   ini_coord_rand(x);
  
-  ini_array(v);
+  ini_matrix(v);
   cell_list(list,x,M,0.0);
   std::cout<<"L="<<L<<" "<<"M="<<M<<std::endl;
   
-  while(j*dtbdhs < 10.){
+  while(j*dtbdhs < 100.){
     j++;
     auto_list_update(&disp_max,x,x_update,list,M);
     eom_langevin_hs(v,x,f,a,&U,dtbdhs,0.0,list,&kine);
@@ -603,21 +621,21 @@ int main(){
     j++;
     temp_anneal = 4.0-j*dtbd*(4.0-temp)/teq;
     auto_list_update(&disp_max,x,x_update,list,M);
-    eom_langevin(v,x,f,a,&U,dtbd,temp_anneal,list,&kine);
+    eom_langevin(v,x,f,a,&U,dtbd,temp_anneal,list,&kine,stress);
     // std::cout<<kine<<" "<<U/Np<<std::endl;
-    //  std::cout<<x[0][2]<<" "<<f[0][0]<<" "<<kine<<std::endl;
+    // std::cout<<x[0][2]<<" "<<f[0][0]<<" "<<kine<<std::endl;
   }
   
   j=0;
   while(j*dtbd < teq){
     j++;
     auto_list_update(&disp_max,x,x_update,list,M);
-    eom_langevin(v,x,f,a,&U,dtbd,temp,list,&kine);
+    eom_langevin(v,x,f,a,&U,dtbd,temp,list,&kine,stress);
     //  std::cout<<U/Np<<std::endl;
   }
   
-  steepest_descent(x,f,gamma,list,a,M,&U);
-  FIRE(x,f,gamma,list,a,M,&U,&rfxy);
+  steepest_descent(x,f,gamma,list,a,M,&U,stress);
+  FIRE(x,f,gamma,list,a,M,&U,&rfxy,stress);
   copy_array(x,x0);
   int count=0;
 
@@ -626,10 +644,10 @@ int main(){
     gamma += d_gamma;
     for(int i=0;i<Np;i++)
       x[i][0] += d_gamma*x[i][1];
-    steepest_descent(x,f,gamma,list,a,M,&U);
-    FIRE(x,f,gamma,list,a,M,&U,&rfxy);
+    steepest_descent(x,f,gamma,list,a,M,&U,stress);
+    FIRE(x,f,gamma,list,a,M,&U,&rfxy,stress);
     if(count == 1){
-      output_coord_NAD(x,x0,a,gamma);
+      output_coord(x,x0,a,gamma,stress);
       count = 0;
     }
     std::cout<<"gamma ="<< gamma <<std::endl;
