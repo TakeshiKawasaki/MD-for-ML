@@ -8,7 +8,7 @@
 
 #define Np 4000 //# of the particles
 #define rho 1.2 //# density
-#define Nn 4500  //# of the neigbour lists
+#define Nn 1000  //# of the neigbour lists
 #define L pow(Np/rho,1./3.)
 #define teq 50 //equilibration time
 //#define tmax 1000 //production run time
