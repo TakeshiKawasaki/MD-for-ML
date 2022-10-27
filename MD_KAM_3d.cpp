@@ -124,9 +124,9 @@ void cell_list(int (*list)[Nn],double (*x)[dim],int M)
   int nx,ny,nz;
   int l,m,n;
   double dx,dy,dz,r2;
-  double thresh=cut*7./6.+skin;
+  double thresh=cut+skin;
   
-  int (*map)[Np]=new int[M*M*M][Np];
+  int (*map)[Np+1]=new int[M*M*M][Np+1];
   
   for(i=0;i<M;i++)
     for(j=0;j<M;j++)
