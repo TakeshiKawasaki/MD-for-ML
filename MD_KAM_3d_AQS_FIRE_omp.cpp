@@ -12,7 +12,7 @@
 #define rho 1.2 //# density
 #define Nn 1000  //# of the neigbour lists
 #define L pow(Np/rho,1./3.)
-#define teq 100 //equilibration time
+#define teq 10 //equilibration time
 //#define tmax 1000 //production run time
 #define dtbdhs 0.1
 #define dtmd 0.001 //dt for molecular dynamics
@@ -23,7 +23,7 @@
 #define skin 1.0// skin size for list update
 #define d_gamma 0.001
 
-const int nthread=6;
+const int nthread=8;
 
 double unif_rand(double left, double right)
 {
@@ -363,11 +363,11 @@ void eom_langevin(double (*v)[dim],double (*x)[dim],double (*f)[dim],int *a,doub
 }
 
 void steepest_descent(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,int M,double *U,double *stress){
-  double dx,dy,dy_temp,dz,dt0=0.0001,zeta=0.0,sum_force =0.0,dxmax=0.0,dymax=0.0,dzmax=0.0,dummy=0.0;
+  double dx,dy,dy_temp,dz,dt0=0.0001,zeta=0.0,sum_force =0.0,dr2max=0.0,dummy=0.0;
   double x0[Np][dim],v[Np][dim];
   int i,j;
   cell_list(list,x,M,gamma);
-  double max;
+  int flag=0;
   
 #pragma omp parallel for private(j)
   for(i=0;i<Np;i++)
@@ -379,7 +379,8 @@ void steepest_descent(double (*x)[dim],double (*f)[dim],double gamma,int (*list)
   for(;;){
     calc_force(x,f,a,U,&dummy,list,gamma,stress);
     sum_force=0.0;
-    //#pragma omp parallel for private(i,j,dx,dy,dy_temp,dz,dxmax,dymax,dzmax) reduction(+:sum_force)
+    
+#pragma omp parallel for private(i,j,dx,dy,dy_temp,dz) reduction(+:sum_force,flag)
     for(i=0;i<Np;i++){
       for(j=0;j<dim;j++){
 	v[i][j] = f[i][j];
@@ -394,26 +395,23 @@ void steepest_descent(double (*x)[dim],double (*f)[dim],double gamma,int (*list)
       dx -= gamma*L*floor((dy_temp+0.5*L)/L);
       dx -= L*floor((dx+0.5*L)/L);
       dz -= L*floor((dz+0.5*L)/L);
+      
+      if(dx*dx+dy*dy+dz*dz > skin*skin*0.25){   
+	flag += 1;
+	dr2max = dx*dx+dy*dy+dz*dz;
+      }  
     }
     
     // printf("SD: sum_force=%.16f,x=%f\n",sum_force,x[0][0]); 
-    max=dxmax*dxmax+dymax*dymax+dzmax*dzmax;
     
-    if(dx*dx+dy*dy+dz*dz > max){
-      dxmax = dx;
-      dymax = dy;
-      dzmax = dz;
-    }
-    
-    if(max > skin*skin*0.25){
-      printf("cell update: SD %f,%f,%f\n",dxmax,dymax,dzmax);
+    if(flag != 0){
+      printf("cell update: SD %f\n",dr2max);
       cell_list(list,x,M,gamma);
+      flag=0;
+      #pragma omp parallel for private(j)    
       for(int i=0;i<Np;i++)
         for(int j=0;j<dim;j++)
           x0[i][j]=x[i][j];
-      dxmax=0.0;
-      dymax=0.0;
-      dzmax=0.0;
     }
     if(sum_force<1.e-1)
       break;
@@ -422,7 +420,7 @@ void steepest_descent(double (*x)[dim],double (*f)[dim],double gamma,int (*list)
 
 void copy_array(double (*x)[dim],double (*x0)[dim]){
   int i,j;
-  #pragma omp parallel for private(j)
+#pragma omp parallel for private(j)
   for(i=0;i<Np;i++)
     for(j=0;j<dim;j++)
       x0[i][j]=x[i][j];
@@ -443,9 +441,9 @@ int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,i
   int i,j,imax;
   double alpha = 0.1,P,max;
   double dt0=0.0001;
-  double v[Np][dim],x0[Np][dim],dx,dy,dy_temp,dz,dxmax,dymax,dzmax,v_nor,f_nor;
+  double v[Np][dim],x0[Np][dim],dx,dy,dy_temp,dz,v_nor,f_nor,dr2max;
   int count=0,count0=0;
-  int conv=0;
+  int conv=0,flag=0;
   double sum_force=0.0;
   double finc=1.1,falpha=0.99,fdec=0.5;
   
@@ -459,9 +457,6 @@ int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,i
     }
   }
   P=0.0;
-  dxmax = 0.0;
-  dymax = 0.0;
-  dzmax = 0.0; //call list update
   
   calc_force(x,f,a,U,rfxy,list,gamma,stress);
    
@@ -488,7 +483,7 @@ int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,i
     norm_array(&v_nor,v);     
     
     
-    //#pragma omp parallel for private(j,dx,dy,dy_temp,dz,dxmax,dymax,dzmax,max)  reduction(+:P,sum_force)
+#pragma omp parallel for private(j,dx,dy,dy_temp,dz)  reduction(+:P,sum_force,flag)
     for(i=0;i<Np;i++){
       for(j=0;j<dim;j++)
 	v[i][j] = (1.0-alpha)*v[i][j]+alpha*f[i][j]/(f_nor+DBL_EPSILON)*v_nor;
@@ -504,29 +499,23 @@ int FIRE(double (*x)[dim],double (*f)[dim],double gamma,int (*list)[Nn],int *a,i
       dx -= gamma*L*floor((dy_temp+0.5*L)/L);
       dx -= L*floor((dx+0.5*L)/L);
       dz -= L*floor((dz+0.5*L)/L);
-      max=dxmax*dxmax+dymax*dymax+dzmax*dzmax;
-      if(dx*dx+dy*dy+dz*dz > max){
-	dxmax = dx;
-	dymax = dy;
-	dzmax = dz;
+
+      if(dx*dx+dy*dy+dz*dz > skin*skin*0.25){
+	flag += 1;
 	imax = i;
+	dr2max = dx*dx+dy*dy+dz*dz;
       }
     }
     //    #pragma omp barrier
-    if(max > skin*skin*0.25){
-      printf("cell update: FIRE %f,%f,%f,imax=%d,U=%f\n",dxmax,dymax,dzmax,imax,*U/Np);
+
+    if(flag != 0){
+      printf("cell update: FIRE %f,imax=%d,U=%f\n",dr2max,imax,*U/Np);
       cell_list(list,x,M,gamma);
-      //  #pragma omp barrier
-    
+      flag=0;
       #pragma omp parallel for private(j)
       for(i=0;i<Np;i++)
 	for(j=0;j<dim;j++) 
-	  x0[i][j]=x[i][j];
-      
-      dxmax=0.0;
-      dymax=0.0;
-      dzmax=0.0;
-      max=0.0;
+	  x0[i][j]=x[i][j];      
     }
     
     //printf("FIRE: sum_force=%.16f,dt=%f,x=%f, alpha=%f,P=%f,gamma=%f \n",sum_force,dt0,x[0][0],alpha,P,gamma);
