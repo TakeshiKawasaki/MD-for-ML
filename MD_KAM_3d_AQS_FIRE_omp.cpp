@@ -8,7 +8,7 @@
 #include <cfloat>
 #include <omp.h>
 
-#define Np 4000 //# of the particles
+#define Np 20000 //# of the particles
 #define rho 1.2 //# density
 #define Nn 1000  //# of the neigbour lists
 #define L pow(Np/rho,1./3.)
@@ -23,7 +23,7 @@
 #define skin 1.0// skin size for list update
 #define d_gamma 0.001
 
-const int nthread=8;
+const int nthread=10;
 
 double unif_rand(double left, double right)
 {
@@ -173,7 +173,7 @@ void cell_list(int (*list)[Nn],double (*x)[dim],int M,double gamma)
     for (k=1; k<=(map[nx+M*ny+M*M*nz][0]); k++){
       j = map[nx+M*ny+M*M*nz][k];
      
-      if(j>i){
+      if(j != i){
 	dx =x[i][0] - x[j][0];
 	dy =x[i][1] - x[j][1];
 	dz =x[i][2] - x[j][2];
@@ -230,11 +230,11 @@ void calc_force_hs(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list
 	dr=sqrt(dr2);
 	dUr=-(1.-t)/aij;
 	f[i][0]-=dUr*dx/dr;
-	f[list[i][j]][0]+=dUr*dx/dr;
+	//	f[list[i][j]][0]+=dUr*dx/dr;
 	f[i][1]-=dUr*dy/dr;
-	f[list[i][j]][1]+=dUr*dy/dr;
+	//	f[list[i][j]][1]+=dUr*dy/dr;
 	f[i][2]-=dUr*dz/dr;
-	f[list[i][j]][2]+=dUr*dz/dr;
+	//	f[list[i][j]][2]+=dUr*dz/dr;
       }
     }
 }
@@ -243,17 +243,16 @@ void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,double *rfxy,
   int i,j,n;
   double dx,dy,dy_temp,dz,dr2,dUr,w2,w6,w12,w2cut,w6cut,w12cut,aij,eij,dUrcut,Ucut,dr;
   double V = L*L*L;
-  double fx[Np][nthread],fy[Np][nthread],fz[Np][nthread],stress_thread[Np][nthread]; 
  
   ini_matrix_dim(f);
   ini_array(stress);
-  ini_matrix_thread(fx);
-  ini_matrix_thread(fy);
-  ini_matrix_thread(fz);
-  ini_matrix_thread(stress_thread);
+  // ini_matrix_thread(fx);
+  // ini_matrix_thread(fy);
+  // ini_matrix_thread(fz);
+  // ini_matrix_thread(stress_thread);
   
   double U0=0,rfxy0=0.0;
-  omp_set_num_threads(nthread);
+  // omp_set_num_threads(nthread);
 
 #pragma omp parallel for private(j,dx,dy,dy_temp,dz,dr2,dUr,w2,w6,w12,w2cut,w6cut,w12cut,aij,eij,dUrcut,Ucut,dr) reduction(+:U0,rfxy0) 
   for(i=0;i<Np;i++)
@@ -272,7 +271,7 @@ void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,double *rfxy,
       if(a[i]+a[list[i][j]] == 2){
 	aij=1.0;
 	eij=1.0;
-	//   1.0 0.8 0.88
+	//  1.0 0.8 0.88
 	//  1.0 0.5 1.5
       }
       if(a[i]+a[list[i][j]] == 3){
@@ -296,34 +295,27 @@ void calc_force(double (*x)[dim],double (*f)[dim],int *a,double *U,double *rfxy,
 	dUrcut=-48.*eij*w12cut/(cut*aij)+24.*eij*w6cut/(cut*aij);
 	Ucut=4.*eij*w12cut-4.*eij*w6cut;
 	
-       	dUr=(-48.*eij*w12+24*eij*w6)/dr2-dUrcut/dr;
+       	dUr=(-48.*eij*w12+24.*eij*w6)/dr2-dUrcut/dr;
 	//	dUr=(-48.*eij*w12+24*eij*w6)/dr2;
-	n=omp_get_thread_num();
-	fx[i][n] -=dUr*dx;
-	fx[list[i][j]][n] +=dUr*dx;
-	fy[i][n] -=dUr*dy;
-	fy[list[i][j]][n] +=dUr*dy;
-	fz[i][n] -=dUr*dz;
-	fz[list[i][j]][n] +=dUr*dz;
+	//      n=omp_get_thread_num();
+	f[i][0] -=dUr*dx;
+	//	fx[list[i][j]][n] +=dUr*dx;
+	f[i][1] -=dUr*dy;
+	//	fy[list[i][j]][n] +=dUr*dy;
+	f[i][2] -=dUr*dz;
+	//	fz[list[i][j]][n] +=dUr*dz;
       
  	U0 +=4.*eij*(w12-w6)-Ucut-dUrcut*(dr-cut*aij);
 	//*U +=4.*eij*(w12-w6)-Ucut;
-	rfxy0 += dUr*dx*dy/V;
-	stress_thread[i][n] += 0.5*dUr*dx*dy/V;
-	stress_thread[list[i][j]][n] += 0.5*dUr*dx*dy/V;
+	rfxy0     += 0.5*dUr*dx*dy/V;
+	stress[i] += 0.5*dUr*dx*dy/V;
+	//stress_thread[list[i][j]][n] += 0.5*dUr*dx*dy/V;
 	//std::cout<<"f_ij="<<dUr*dx<<std::endl;
       }
     }
-#pragma omp parallel for private(j)
-  for(i=0;i<Np;i++)
-    for(j=0;j<nthread;j++){
-      stress[i] += stress_thread[i][j];
-      f[i][0] +=  fx[i][j]; 
-      f[i][1] +=  fy[i][j];
-      f[i][2] +=  fz[i][j];
-    }
-  *U=U0;
-  *rfxy=rfxy0;
+
+  *U = 0.5*U0;
+  *rfxy = rfxy0;
 }
 
 void eom_langevin_hs(double (*v)[dim],double (*x)[dim],double (*f)[dim],int *a,double *U,double dt,double temp0,int (*list)[Nn],double *kine){
@@ -621,7 +613,7 @@ void calc_disp_max(double *disp_max,double (*x)[dim],double (*x_update)[dim])
   double dx,dy,dz;
   double disp,disp_max0;
   disp_max0 = *disp_max;
-  //#pragma omp parallel for private(i) reduction(max:disp_max0)
+  //  #pragma omp parallel for private(i) reduction(max:disp_max0)
   for(i=0;i<Np;i++){
     dx=x[i][0]-x_update[i][0];
     dy=x[i][1]-x_update[i][1];
@@ -640,7 +632,7 @@ void auto_list_update(double *disp_max,double (*x)[dim],double (*x_update)[dim],
   static int count=0;
   count++;
   calc_disp_max(&(*disp_max),x,x_update);
-  if(*disp_max > 0.5*skin*skin*0.25){
+  if(*disp_max > skin*skin*0.25){
     cell_list(list,x,M,0.0);
     update(x_update,x);
     *disp_max=0.0;
@@ -649,6 +641,7 @@ void auto_list_update(double *disp_max,double (*x)[dim],double (*x_update)[dim],
 }
 
 int main(){
+  omp_set_num_threads(nthread);
   double x[Np][dim],x0[Np][dim],x_update[Np][dim],v[Np][dim],f[Np][dim],stress[Np];
   int list[Np][Nn],a[Np];
   double tout=0.0,U,rfxy,kine,disp_max=0.0,temp_anneal,gamma=0.0;
