@@ -7,6 +7,7 @@
 #include <fstream>
 #include <cfloat>
 #include <omp.h>
+#include "MT.h"
 
 #define Np 4000 //# of the particles
 #define rho 1.2 //# density
@@ -27,7 +28,7 @@ const int nthread=10;
 
 double unif_rand(double left, double right)
 {
-  return left + (right - left)*rand()/RAND_MAX;
+  return left + (right - left)*genrand_real1();
 }
 
 double gaussian_rand(void)
@@ -642,6 +643,11 @@ void auto_list_update(double *disp_max,double (*x)[dim],double (*x_update)[dim],
 
 int main(){
   omp_set_num_threads(nthread);
+
+#pragma omp parallel
+  init_genrand((unsigned)time(NULL)*omp_get_thread_num());
+
+
   double x[Np][dim],x0[Np][dim],x_update[Np][dim],v[Np][dim],f[Np][dim],stress[Np];
   int list[Np][Nn],a[Np];
   double tout=0.0,U,rfxy,kine,disp_max=0.0,temp_anneal,gamma=0.0;
