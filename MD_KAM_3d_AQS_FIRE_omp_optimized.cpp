@@ -227,7 +227,7 @@ void calc_force_hs(double (*x)[dim],double (*f)[dim],int *a,double *U,int (*list
 
       if(dr2<aij*aij){
 	//	printf("%f\n",t);
-	t=sqrt(dr2/aij*aij);
+	t=sqrt(dr2/(aij*aij));
 	dr=sqrt(dr2);
 	dUr=-(1.-t)/aij;
 	f[i][0]-=dUr*dx/dr;
